@@ -6,6 +6,7 @@ function Memo() {
   const [title, setTitle] = useState('')
   const [memo, setMemo] = useState('')
   const [memos, setMemos] = useState([])
+  const [memoId, setmemoId] = useState(null)
 
   useEffect(() => {
     const savedMemos = localStorage.getItem('dailyMemos')
@@ -30,10 +31,12 @@ function Memo() {
       } else {
 
       }
+      setmemoId(null);
       setTitle('');
       setMemo('');      
     } catch (error) {
       // 네트워크 오류 시 로컬에서 로드 
+      setmemoId(null);
       setTitle(''); 
       setMemo('');
     }
@@ -53,12 +56,13 @@ function Memo() {
       return;
     }
     try {
+      const saveData = memos.find(item => item.memoId === memoId);
       const response = await fetch('http://localhost:8080/api/memo/save', {
         method: 'POST', 
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ regDate: currentDate, title, memoContent: memo, userId: "here" }),
+        body: JSON.stringify({ regDate: currentDate, title, memoContent: memo, userId: "here", memoId }),
       });
       if (response.ok) {
         selectMemo(currentDate);
@@ -110,8 +114,13 @@ function Memo() {
       </div>
       <div className="saved-memos">
         <h2>저장된 메모</h2>
-        {memos.sort((a, b) => b.menuId - a.menuId).map(rowData => (
-          <div key={rowData.regDate || rowData.menuId} className="memo-item">
+        {memos.sort((a, b) => b.memoId - a.memoId).map(rowData => (
+          <div key={rowData.memoId} className="memo-item" onClick={() => {
+            setmemoId(rowData.memoId);
+            setCurrentDate(rowData.regDate);
+            setTitle(rowData.title || '');
+            setMemo(rowData.memoContent || '');
+          }}>
             <h3>{rowData.regDate}</h3>
             <h4>{rowData.title || '제목 없음'}</h4>
             <p>{rowData.memoContent}</p>
