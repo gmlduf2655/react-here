@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import './memo.css'
+//import './memo.css'
 
 function Memo() {
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0])
