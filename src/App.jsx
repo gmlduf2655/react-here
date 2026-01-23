@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Home, Settings, Users, FileText, BarChart3, Mail, Search, Bell, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Home, Settings, Users, FileText, BarChart3, Mail, Search, Bell, ChevronDown, ChevronLeft, ChevronRight, NotebookText } from 'lucide-react';
 //import { LoginPage } from '@/components/LoginPage';
 import { LoginPage } from './login/LoginPage.jsx';
 import { SignupPage } from './signUp/SignUpPage.jsx';
+import { MemoPage } from './memo/MemoPage.jsx';
 
 export default function App() {
   const [activeMenu, setActiveMenu] = useState('home');
@@ -17,6 +18,7 @@ export default function App() {
     { id: 'documents', label: '문서', icon: FileText },
     { id: 'analytics', label: '분석', icon: BarChart3 },
     { id: 'messages', label: '메시지', icon: Mail },
+    { id: 'memos', label: '메모장', icon: NotebookText },
     { id: 'settings', label: '설정', icon: Settings },
   ];
 
@@ -26,6 +28,14 @@ export default function App() {
     { id: 'team', label: '팀' },
     { id: 'reports', label: '리포트' },
   ];
+  useEffect(() => {
+    // 초기 로그인 상태 확인 (예: 로컬 스토리지에서 토큰 확인)
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
   // 로그인하지 않은 경우 로그인 페이지 표시
   if (!isLoggedIn) {
     if (showSignup) {
@@ -152,36 +162,42 @@ export default function App() {
 
         {/* 오른쪽 메인 콘텐츠 */}
         <main className="flex-1 bg-gray-50 overflow-auto">
-          <div className="p-8">
-            <div className="mb-6">
-              <h2 className="text-3xl mb-2">
-                {menuItems.find((item) => item.id === activeMenu)?.label}
-              </h2>
-              <p className="text-gray-600">
-                {activeMenu} 페이지에 오신 것을 환영합니다
-              </p>
+          {activeMenu === 'memos' ? (
+            <div className="h-full p-8">
+              <MemoPage />
             </div>
+          ) : (
+            <div className="p-8">
+              <div className="mb-6">
+                <h2 className="text-3xl mb-2">
+                  {menuItems.find((item) => item.id === activeMenu)?.label}
+                </h2>
+                <p className="text-gray-600">
+                  {activeMenu} 페이지에 오신 것을 환영합니다
+                </p>
+              </div>
 
-            {/* 콘텐츠 카드 예시 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((num) => (
-                <div
-                  key={num}
-                  className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
-                >
-                  <h3 className="text-lg mb-2">콘텐츠 카드 {num}</h3>
-                  <p className="text-gray-600">
-                    이곳에 {activeMenu} 관련 콘텐츠가 표시됩니다.
-                  </p>
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <button className="text-blue-600 hover:text-blue-700">
-                      자세히 보기 →
-                    </button>
+              {/* 콘텐츠 카드 예시 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((num) => (
+                  <div
+                    key={num}
+                    className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+                  >
+                    <h3 className="text-lg mb-2">콘텐츠 카드 {num}</h3>
+                    <p className="text-gray-600">
+                      이곳에 {activeMenu} 관련 콘텐츠가 표시됩니다.
+                    </p>
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <button className="text-blue-600 hover:text-blue-700">
+                        자세히 보기 →
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </main>
       </div>
       {/* Footer */}
