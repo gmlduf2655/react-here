@@ -98,45 +98,57 @@ export function MemoPage() {
     });
   };
 
-  const handleSaveMemo = () => {
+  const handleSaveMemo = async () => {
     if (!formData.title.trim()) {
       alert("제목을 입력해주세요.");
       return;
     }
-
-    if (selectedMemo) {
-      // 수정
-      setMemos(
-        memos.map((memo) =>
-          memo.id === selectedMemo.id
-            ? { ...memo, ...formData }
-            : memo,
-        ),
-      );
-    } else {
-      // 새로 추가
-      const newMemo = {
-        id: Date.now().toString(),
-        ...formData,
-      };
-      setMemos([newMemo, ...memos]);
+    if (!formData.memoContent.trim()) {
+      alert("내용을 입력해주세요.");
+      return;
     }
-
-    setIsEditing(false);
-    setSelectedMemo(null);
-    setFormData({
-      regDate: new Date().toISOString().split("T")[0],
-      title: "",
-      memoContent: "",
-    });
+    try {
+      const memoId = selectedMemo ? selectedMemo.memoId : "";
+      const response = await fetch('http://localhost:8080/api/memo/saveMemo', {
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ regDate: formData.regDate, title: formData.title, memoContent: formData.memoContent, userId: sessionStorage.getItem("userId"), memoId }),
+      });
+      if (response.ok) {
+        handleCancel();     
+        selectMemoData();
+        alert('메모가 저장되었습니다.');
+      } else {
+        alert('메모 저장에 실패했습니다.');
+      }
+    } catch (error) {
+      alert('네트워크 오류가 발생했습니다.');
+    }    
+    /*
+    */
   };
 
-  const handleDeleteMemo = (id) => {
+  const handleDeleteMemo = async (id) => {
     if (confirm("이 메모를 삭제하시겠습니까?")) {
-      setMemos(memos.filter((memo) => memo.id !== id));
-      if (selectedMemo?.id === id) {
-        setSelectedMemo(null);
-        setIsEditing(false);
+      try {
+        const response = await fetch('http://localhost:8080/api/memo/deleteMemo', {
+          method: 'POST', 
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ memoId: id }),
+        });
+        if (response.ok) {
+          handleCancel();     
+          selectMemoData();
+          alert('메모가 삭제되었습니다.');
+        } else {
+          alert('메모 삭제에 실패했습니다.');
+        }
+      } catch (error) {
+        alert('네트워크 오류가 발생했습니다.');
       }
     }
   };
@@ -158,11 +170,11 @@ export function MemoPage() {
 
   useEffect(() => {
     if (dateFilter.startDate && dateFilter.endDate) {
-      selectMemo();
+      selectMemoData();
     }
   }, [dateFilter]);
 
-  const selectMemo = async () => {
+  const selectMemoData = async () => {
     const params = new URLSearchParams({
       startDate: dateFilter.startDate,
       endDate: dateFilter.endDate
@@ -264,7 +276,7 @@ export function MemoPage() {
                     <div
                       key={memo.id}
                       className={`p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                        selectedMemo?.id === memo.id
+                        selectedMemo?.memoId === memo.id
                           ? "border-blue-600 bg-blue-50"
                           : "border-gray-200 hover:border-gray-300 bg-white"
                       }`}
@@ -397,7 +409,7 @@ export function MemoPage() {
                 </button>
                 <button
                   onClick={() =>
-                    handleDeleteMemo(selectedMemo.id)
+                    handleDeleteMemo(selectedMemo.memoId)
                   }
                   className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   title="삭제"

@@ -30,7 +30,7 @@ export default function App() {
   ];
   useEffect(() => {
     // 초기 로그인 상태 확인 (예: 로컬 스토리지에서 토큰 확인)
-    const userId = localStorage.getItem('userId');
+    const userId = sessionStorage.getItem('userId');
     if (userId) {
       setIsLoggedIn(true);
     }
