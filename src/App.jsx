@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Home, Settings, Users, FileText, BarChart3, Mail, Search, Bell, ChevronDown, ChevronLeft, ChevronRight, NotebookText } from 'lucide-react';
+import { Home, Settings, Users, FileText, BarChart3, Mail, Search, Bell, ChevronDown, ChevronLeft, ChevronRight, NotebookText, Map } from 'lucide-react';
 //import { LoginPage } from '@/components/LoginPage';
 import { LoginPage } from './login/LoginPage.jsx';
 import { SignupPage } from './signUp/SignUpPage.jsx';
 import { MemoPage } from './memo/MemoPage.jsx';
+import { MindMapPage } from './mindMap/MindMapPage.jsx';
 
 export default function App() {
   const [activeMenu, setActiveMenu] = useState('home');
@@ -19,6 +20,7 @@ export default function App() {
     { id: 'analytics', label: '분석', icon: BarChart3 },
     { id: 'messages', label: '메시지', icon: Mail },
     { id: 'memos', label: '메모장', icon: NotebookText },
+    { id: 'mindMap', label: '마인드맵', icon: Map },
     { id: 'settings', label: '설정', icon: Settings },
   ];
 
@@ -165,6 +167,10 @@ export default function App() {
           {activeMenu === 'memos' ? (
             <div className="h-full p-8">
               <MemoPage />
+            </div>
+          ) : activeMenu === 'mindMap' ? (
+            <div className="h-full p-8">
+              <MindMapPage />
             </div>
           ) : (
             <div className="p-8">

@@ -9,8 +9,11 @@ import {
 } from "lucide-react";
 import dayjs from 'dayjs';
 import { useRef } from "react";
+import { default as MindMap} from "./MindMap.jsx";
+//import "mind-elixir/dist/style.css";
 
-export function MemoPage() {
+export function MindMapPage() {
+  const mindMapRef = useRef(null);
   const [memos, setMemos] = useState([
     {
       memoId: "1",
@@ -28,17 +31,37 @@ export function MemoPage() {
     },
   ]);
   const [selectedMemo, setSelectedMemo] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    regDate: new Date().toISOString().split("T")[0],
-    title: "",
-    memoContent: "",
-  });
   const [dateFilter, setDateFilter] = useState({
     startDate: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
     endDate: dayjs().format('YYYY-MM-DD'),
   });
   const fileInputRef = useRef(null);
+
+  const mindData = {
+    nodeData: {
+      id: "root",
+      topic: "프로젝트 메모",
+      children: [
+        {
+          id: "login",
+          topic: "로그인",
+          children: [
+            { id: "jwt", topic: "JWT 인증", children: [] },
+            { id: "refresh", topic: "Refresh Token", children: [] },
+          ],
+        },
+        {
+          id: "memo",
+          topic: "메모 기능",
+          children: [
+            { id: "crud", topic: "CRUD", children: [] },
+            { id: "tag", topic: "태그", children: [] },
+          ],
+        },
+      ],
+    },
+    linkData: [],
+  };                                
 
   // 날짜 필터링된 메모
   const filteredMemos = memos.filter((memo) => {
@@ -80,101 +103,40 @@ export function MemoPage() {
     });
   };
 
-  const handleAddNew = () => {
-    setSelectedMemo(null);
-    setIsEditing(true);
-    setFormData({
-      regDate: new Date().toISOString().split("T")[0],
-      title: "",
-      memoContent: "",
-    });
-  };
-
-  const handleEditMemo = (memo) => {
-    setSelectedMemo(memo);
-    setIsEditing(true);
-    setFormData({
-      regDate: memo.regDate,
-      title: memo.title,
-      memoContent: memo.memoContent,
-    });
-  };
-
-  const handleSaveMemo = async () => {
-    if (!formData.title.trim()) {
-      alert("제목을 입력해주세요.");
-      return;
-    }
-    if (!formData.memoContent.trim()) {
-      alert("내용을 입력해주세요.");
-      return;
-    }
-    try {
-      const memoId = selectedMemo ? selectedMemo.memoId : "";
-      const response = await fetch('http://localhost:8080/api/memo/saveMemo', {
-        method: 'POST', 
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ regDate: formData.regDate, title: formData.title, memoContent: formData.memoContent, userId: sessionStorage.getItem("userId"), memoId }),
-      });
-      if (response.ok) {
-        handleCancel();     
-        selectMemoData();
-        alert('메모가 저장되었습니다.');
-      } else {
-        alert('메모 저장에 실패했습니다.');
-      }
-    } catch (error) {
-      alert('네트워크 오류가 발생했습니다.');
-    }    
-    /*
-    */
-  };
-
-  const handleDeleteMemo = async (id) => {
-    if (confirm("이 메모를 삭제하시겠습니까?")) {
-      try {
-        const response = await fetch('http://localhost:8080/api/memo/deleteMemo', {
-          method: 'POST', 
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ memoId: id }),
-        });
-        if (response.ok) {
-          handleCancel();     
-          selectMemoData();
-          alert('메모가 삭제되었습니다.');
-        } else {
-          alert('메모 삭제에 실패했습니다.');
-        }
-      } catch (error) {
-        alert('네트워크 오류가 발생했습니다.');
-      }
-    }
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    setSelectedMemo(null);
-    setFormData({
-      regDate: new Date().toISOString().split("T")[0],
-      title: "",
-      memoContent: "",
-    });
-  };
-
-  const handleSelectMemo = (memo) => {
-    setSelectedMemo(memo);
-    setIsEditing(false);
-  };
-
   useEffect(() => {
     if (dateFilter.startDate && dateFilter.endDate) {
       selectMemoData();
     }
   }, [dateFilter]);
+
+  const handleSelectMemo = (memo) => {
+    setSelectedMemo(memo);
+  };  
+  /*
+  useEffect(() => {
+    if (!mindMapRef.current) return;
+
+    const mind = new MindElixir({
+      el: mindMapRef.current,
+      direction: MindElixir.RIGHT,
+      data: selectedMemo?.memoContent || "새로운 마인드맵",
+      draggable: true,
+      contextMenu: true,
+      toolBar: true,
+      nodeMenu: true,
+      keypress: true,
+    });
+
+    mind.init();
+
+    // 노드 클릭 이벤트
+    mind.bus.addListener("selectNode", (node) => {
+      console.log("선택한 노드:", node);
+    });
+
+    return () => mind.destroy();
+  }, [selectedMemo]);
+  */
 
   const selectMemoData = async () => {
     const params = new URLSearchParams({
@@ -250,13 +212,6 @@ export function MemoPage() {
           >
             <Plus className="size-5" /><span>realm-csv변환</span>
           </button>              
-          <button
-            onClick={handleAddNew}
-            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            title="새 메모 작성"
-          >
-            <Plus className="size-5" />
-          </button>
         </div>
 
         {/* 날짜 필터 */}
@@ -365,82 +320,7 @@ export function MemoPage() {
 
       {/* 오른쪽: 메모 상세/작성 */}
       <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-        {isEditing ? (
-          // 편집 모드
-          <>
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg">
-                {selectedMemo ? "메모 수정" : "새 메모 작성"}
-              </h3>
-            </div>
-            <div className="flex-1 p-6 overflow-auto space-y-4">
-              <div>
-                <label className="block text-sm mb-2">
-                  메모 일자
-                </label>
-                <input
-                  type="regDate"
-                  value={formData.regDate}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      regDate: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-2">
-                  메모 제목
-                </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      title: e.target.value,
-                    })
-                  }
-                  placeholder="제목을 입력하세요"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-2">
-                  메모 내용
-                </label>
-                <textarea
-                  value={formData.memoContent}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      memoContent: e.target.value,
-                    })
-                  }
-                  placeholder="내용을 입력하세요"
-                  rows={26}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-            </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={handleCancel}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleSaveMemo}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                저장
-              </button>
-            </div>
-          </>
-        ) : selectedMemo ? (
+        {selectedMemo ? (
           // 메모 상세 보기
           <>
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
@@ -450,49 +330,12 @@ export function MemoPage() {
                   {selectedMemo.regDate}
                 </span>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditMemo(selectedMemo)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="수정"
-                >
-                  <Edit2 className="size-5" />
-                </button>
-                <button
-                  onClick={() =>
-                    handleDeleteMemo(selectedMemo.memoId)
-                  }
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="삭제"
-                >
-                  <Trash2 className="size-5" />
-                </button>
-              </div>
             </div>
-            <div className="flex-1 p-6 overflow-auto">
-              <h2 className="text-2xl mb-4">
-                {selectedMemo.title}
-              </h2>
-              <div className="text-gray-700 whitespace-pre-wrap">
-                {selectedMemo.memoContent}
-              </div>
-            </div>
+            <MindMap data={mindData} />
           </>
         ) : (
-          // 메모 선택 안 됨
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            <div className="text-center">
-              <p className="text-lg">
-                메모를 선택하거나 새로 작성해보세요
-              </p>
-              <button
-                onClick={handleAddNew}
-                className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
-              >
-                <Plus className="size-5" />새 메모 작성
-              </button>
-            </div>
-          </div>
+          <>
+          </>
         )}
       </div>
     </div>
