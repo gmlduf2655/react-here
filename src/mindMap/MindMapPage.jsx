@@ -112,31 +112,40 @@ export function MindMapPage() {
   const handleSelectMemo = (memo) => {
     setSelectedMemo(memo);
   };  
-  /*
+  
   useEffect(() => {
-    if (!mindMapRef.current) return;
-
-    const mind = new MindElixir({
-      el: mindMapRef.current,
-      direction: MindElixir.RIGHT,
-      data: selectedMemo?.memoContent || "새로운 마인드맵",
-      draggable: true,
-      contextMenu: true,
-      toolBar: true,
-      nodeMenu: true,
-      keypress: true,
-    });
-
-    mind.init();
-
-    // 노드 클릭 이벤트
-    mind.bus.addListener("selectNode", (node) => {
-      console.log("선택한 노드:", node);
-    });
-
-    return () => mind.destroy();
+    if (selectedMemo) {
+      // 선택된 메모에 따라 mindData 업데이트 로직 추가
+      console.log("선택된 메모:", selectedMemo);
+      // 파이썬에 selectedMemo 전달하여 마인드맵 데이터 받아오기'
+      fetchMindMap();
+    }
   }, [selectedMemo]);
-  */
+
+  const fetchMindMap = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/mindmap", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          memo: selectedMemo.memoContent, // 또는 selectedMemo.text
+        }),
+      });
+
+      const mindData = await response.json();
+      console.log("받아온 mindData:", mindData);
+      console.log("mindMapRef.current:", mindMapRef.current);
+
+      // MindElixir 갱신
+      if (mindMapRef.current) {
+        mindMapRef.current.setData(mindData);
+      }
+    } catch (err) {
+      console.error("마인드맵 생성 실패:", err);
+    }
+  };  
 
   const selectMemoData = async () => {
     const params = new URLSearchParams({
@@ -331,7 +340,7 @@ export function MindMapPage() {
                 </span>
               </div>
             </div>
-            <MindMap data={mindData} />
+            <MindMap ref={mindMapRef} data={mindData} />
           </>
         ) : (
           <>

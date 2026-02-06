@@ -1,18 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle  } from "react";
 import MindElixir from "mind-elixir";
 //import "mind-elixir/dist/MindElixir.css";
 
-export default function MindMap({ data }) {
-  const ref = useRef(null);
+export default forwardRef(({ data }, ref) => {
+  const containerRef = useRef(null);
   const mindRef = useRef(null);
-    console.log("data =", data);
-    console.log("data.nodeData =", data?.nodeData);
-    console.log("typeof data =", typeof data);
+
   useEffect(() => {
-    if (!ref.current || !data || mindRef.current) return;
+    if (!containerRef.current || !data || mindRef.current) return;
 
     mindRef.current = new MindElixir({
-      el: ref.current,
+      el: containerRef.current,
       direction: MindElixir.RIGHT,
       draggable: true,
       contextMenu: true,
@@ -28,9 +26,19 @@ export default function MindMap({ data }) {
     mindRef.current.bus.addListener("selectNode", (node) => {
       console.log("선택한 노드:", node);
     });
-
     //return () => mind.destroy();
   }, [data]);
 
-  return <div ref={ref} style={{ height: "600px" }} />;
-}
+    // 부모에게 노출할 메서드 정의
+    useImperativeHandle(ref, () => ({
+      setData: (newData) => {
+        if (mindRef.current) {
+          mindRef.current.init(newData);
+          mindRef.current.refresh();
+        }
+      },
+    }));    
+
+
+  return <div ref={containerRef} style={{ height: "600px" }} />;
+});
