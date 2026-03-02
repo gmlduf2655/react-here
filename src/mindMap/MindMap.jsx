@@ -40,5 +40,5 @@ export default forwardRef(({ data }, ref) => {
     }));    
 
 
-  return <div ref={containerRef} style={{ height: "600px" }} />;
+  return <div ref={containerRef} class="h-full flex gap-6 h-dvh" />;
 });

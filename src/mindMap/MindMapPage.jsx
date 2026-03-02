@@ -41,6 +41,7 @@ export function MindMapPage() {
     nodeData: {
       id: "root",
       topic: "프로젝트 메모",
+      /*
       children: [
         {
           id: "login",
@@ -59,6 +60,8 @@ export function MindMapPage() {
           ],
         },
       ],
+      */
+     children: []
     },
     linkData: [],
   };                                
@@ -130,6 +133,7 @@ export function MindMapPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          topic: selectedMemo.title,
           memo: selectedMemo.memoContent, // 또는 selectedMemo.text
         }),
       });
@@ -328,7 +332,7 @@ export function MindMapPage() {
       </div>
 
       {/* 오른쪽: 메모 상세/작성 */}
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
+      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-auto">
         {selectedMemo ? (
           // 메모 상세 보기
           <>
