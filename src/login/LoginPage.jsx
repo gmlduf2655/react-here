@@ -20,13 +20,14 @@ export function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
       if(data.length > 0) {
         sessionStorage.setItem('userId', data[0].userId);
         sessionStorage.setItem('userName', data[0].userName);
-        alert('로그인에 성공했습니다.');
+        sessionStorage.setItem('position', data[0].position);
+        //alert('로그인에 성공했습니다.');
         onLoginSuccess();  // 메인 페이지로 이동
       } else{
         alert('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.');        
       }
     } else {
-      alert('로그인에 실패했습니다. ');
+      alert('로그인에 실패했습니다. 서버에 오류가 발생하였습니다.');
     }    
   };
 
@@ -50,10 +51,10 @@ export function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
         {/* 로그인 폼 */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* 이메일 입력 */}
+            {/* 아이디 입력 */}
             <div>
-              <label htmlFor="email" className="block text-sm mb-2 text-gray-700">
-                이메일
+              <label htmlFor="userId" className="block text-sm mb-2 text-gray-700">
+                아이디
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-gray-400" />
@@ -62,7 +63,7 @@ export function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
                   type="text"
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
-                  placeholder="your@email.com"
+                  placeholder="아이디를 입력하세요"
                   className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
                   style={{ fontWeight: 'normal' }}
                   required
@@ -122,14 +123,14 @@ export function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
             </button>
           </form>
 
-          {/* 구분선 */}
+          {/* 구분선 
           <div className="flex items-center gap-4 my-6">
             <div className="flex-1 h-px bg-gray-200"></div>
             <span className="text-sm text-gray-500" style={{ fontWeight: 'normal' }}>또는</span>
             <div className="flex-1 h-px bg-gray-200"></div>
           </div>
 
-          {/* 소셜 로그인 */}
+          /* 소셜 로그인 
           <div className="space-y-3">
             <button type="button" className="w-full flex items-center justify-center gap-3 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
               <svg className="size-5" viewBox="0 0 24 24">
@@ -160,6 +161,7 @@ export function LoginPage({ onLoginSuccess, onSwitchToSignup }) {
               <span className="text-gray-700" style={{ fontWeight: 'normal' }}>Facebook으로 계속하기</span>
             </button>
           </div>
+          */}
 
           {/* 회원가입 링크 */}
           <div className="mt-6 text-center">

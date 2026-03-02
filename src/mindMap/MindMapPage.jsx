@@ -204,9 +204,9 @@ export function MindMapPage() {
   return (
     <div className="h-full flex gap-6 h-dvh">
       {/* 왼쪽: 메모 리스트 */}
-      <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg">메모 목록</h3>
+      <div className="w-80 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h3 className="text-lg dark:text-white">메모 목록</h3>
           <input
             ref={fileInputRef}
             className="hidden"
@@ -228,14 +228,14 @@ export function MindMapPage() {
         </div>
 
         {/* 날짜 필터 */}
-        <div className="p-4 border-b border-gray-200 space-y-3">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
           <div className="flex items-center gap-2 mb-2">
-            <Filter className="size-4 text-gray-600" />
-            <span className="text-sm">기간 조회</span>
+            <Filter className="size-4 text-gray-600 dark:text-gray-400" />
+            <span className="text-sm dark:text-gray-300">기간 조회</span>
             {(dateFilter.startDate || dateFilter.endDate) && (
               <button
                 onClick={handleResetFilter}
-                className="ml-auto text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                className="ml-auto text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1"
               >
                 <X className="size-3" />
                 초기화
@@ -243,7 +243,7 @@ export function MindMapPage() {
             )}
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">
+            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
               시작일
             </label>
             <input
@@ -255,11 +255,11 @@ export function MindMapPage() {
                   startDate: e.target.value,
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">
+            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
               종료일
             </label>
             <input
@@ -271,11 +271,11 @@ export function MindMapPage() {
                   endDate: e.target.value,
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {(memos.length >= 0) && (
-            <div className="text-xs text-gray-600 pt-2">
+            <div className="text-xs text-gray-600 dark:text-gray-400 pt-2">
               총 {memos.length}개의 메모
             </div>
           )}
@@ -286,7 +286,7 @@ export function MindMapPage() {
             .sort((a, b) => b.localeCompare(a)) // 최신 날짜 순
             .map((regDate) => (
               <div key={regDate}>
-                <div className="flex items-center gap-2 mb-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2 mb-2 text-sm text-gray-600 dark:text-gray-400">
                   <Calendar className="size-4" />
                   <span>{regDate}</span>
                 </div>
@@ -296,17 +296,17 @@ export function MindMapPage() {
                       key={memo.id}
                       className={`p-3 rounded-lg border-2 cursor-pointer transition-colors ${
                         selectedMemo?.memoId === memo.id
-                          ? "border-blue-600 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300 bg-white"
+                          ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30"
+                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-700"
                       }`}
                       onClick={() => handleSelectMemo(memo)}
                     >
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className="font-medium text-gray-900 line-clamp-1">
+                        <h4 className="font-medium text-gray-900 dark:text-white line-clamp-1">
                           {memo.title}
                         </h4>
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                         {memo.memoContent}
                       </p>
                     </div>
@@ -315,7 +315,7 @@ export function MindMapPage() {
               </div>
             ))}
           {filteredMemos.length === 0 && (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
               <p>
                 {dateFilter.startDate || dateFilter.endDate
                   ? "해당 기간에 메모가 없습니다."
@@ -332,14 +332,14 @@ export function MindMapPage() {
       </div>
 
       {/* 오른쪽: 메모 상세/작성 */}
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-auto">
+      <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-auto">
         {selectedMemo ? (
           // 메모 상세 보기
           <>
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Calendar className="size-5 text-gray-600" />
-                <span className="text-gray-600">
+                <Calendar className="size-5 text-gray-600 dark:text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-400">
                   {selectedMemo.regDate}
                 </span>
               </div>

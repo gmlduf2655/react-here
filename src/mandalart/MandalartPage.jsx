@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Save, RotateCcw, Download } from 'lucide-react';
 
 const COLORS = {
-  center: 'bg-blue-100 border-blue-300',
-  subGoal: 'bg-purple-50 border-purple-200',
-  action: 'bg-gray-50 border-gray-200',
-  centerText: 'text-blue-900',
-  subGoalText: 'text-purple-900',
-  actionText: 'text-gray-700',
+  center: 'bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700',
+  subGoal: 'bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-700',
+  action: 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600',
+  centerText: 'text-blue-900 dark:text-blue-200',
+  subGoalText: 'text-purple-900 dark:text-purple-200',
+  actionText: 'text-gray-700 dark:text-gray-300',
 };
 
 export function MandalartPage() {
@@ -148,7 +148,7 @@ export function MandalartPage() {
       <div className="mb-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-3xl mb-2">만다라트</h2>
+            <h2 className="text-3xl mb-2 dark:text-white">만다라트</h2>
             {/*
             <p className="text-gray-600">
               중앙에 메인 목표를 입력하고, 주변 8개 칸에 하위 목표를 작성하세요.
@@ -159,29 +159,15 @@ export function MandalartPage() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={handleLoad}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-            >
-              <Download className="size-4" />
-              불러오기
-            </button>
-            <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2 border border-blue-300 dark:border-blue-700"
             >
               <Save className="size-4" />
               저장
             </button>
             <button
-              onClick={handleExport}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
-            >
-              <Download className="size-4" />
-              내보내기
-            </button>
-            <button
               onClick={handleReset}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2 border border-red-300 dark:border-red-700"
             >
               <RotateCcw className="size-4" />
               초기화
@@ -193,7 +179,7 @@ export function MandalartPage() {
       {/* 만다라트 그리드 */}
       <div className="flex-1 flex items-center justify-center overflow-auto">
         <div className="inline-block">
-          <div className="grid grid-cols-9 gap-0 border-2 border-gray-400 bg-white">
+          <div className="grid grid-cols-9 gap-0 border-2 border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-800">
             {grid.map((row, rowIndex) => (
               row.map((cell, colIndex) => {
                 const isThickBorderRight = (colIndex + 1) % 3 === 0 && colIndex !== 8;
@@ -255,7 +241,7 @@ export function MandalartPage() {
       </div>
 
       {/* 범례 */}
-      <div className="mt-6 flex items-center gap-6 text-sm">
+      <div className="mt-6 flex items-center gap-6 text-sm dark:text-gray-300">
         <div className="flex items-center gap-2">
           <div className={`w-6 h-6 ${COLORS.center} border-2`}></div>
           <span>메인 목표</span>
