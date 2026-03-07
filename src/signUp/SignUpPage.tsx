@@ -1,28 +1,42 @@
 import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 
-export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
-  const [confirmPassword, setConfirmPassword] = useState('');
+interface SignupPageProps {
+  onSignupSuccess: () => void;
+  onSwitchToLogin: () => void;
+}
+
+interface SignupFormData {
+  userId: string;
+  userPwd: string;
+  confirmPassword: string;
+  userName: string;
+  email: string;
+}
+
+type FormErrors = Record<string, string>;
+
+export function SignupPage({ onSignupSuccess, onSwitchToLogin }: SignupPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [agreeToPrivacy, setAgreeToPrivacy] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SignupFormData>({
     userId: '',
     userPwd: '',
     confirmPassword: '',
     userName: '',
     email: ''
   });
-  const [errors, setErrors] = useState({});
-  const [isUserIdAvailablerId, setIsUserIdAvailablerId] = useState(null);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isUserIdAvailablerId, setIsUserIdAvailablerId] = useState<boolean | null>(null);
 
-  const handleChange = (e) => {
-    console.log("test",e.target);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("test", e.target);
     const { name, value } = e.target;
-    console.log("test1",name);
-    console.log("test2",value);
+    console.log("test1", name);
+    console.log("test2", value);
     setFormData({ ...formData, [name]: value });
 
     // 실시간 비밀번호 일치 확인
@@ -40,7 +54,7 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
   const checkUserId = async () => {
     // 간단한 중복 체크 (실제로는 API 호출)
     if (!formData.userId) {
-      setIsUserIdAvailablerId(false)
+      setIsUserIdAvailablerId(false);
       setErrors({ ...errors, userId: '아이디를 입력하세요.' });
       return;
     }
@@ -48,12 +62,12 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
       userId: formData.userId
     });
     const response = await fetch(`http://localhost:8080/api/user/selectUserCnt?${params}`, {
-      method: 'GET', 
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-    });  
-    if(response.ok) {
+    });
+    if (response.ok) {
       const data = await response.json();
       data[0].cnt === 0 ? setIsUserIdAvailablerId(true) : setIsUserIdAvailablerId(false);
       if (data[0].cnt > 0) {
@@ -61,14 +75,14 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
       } else {
         //setErrors({ ...errors, userId: '' });
       }
-    }else{
+    } else {
       setErrors({ ...errors, userId: '아이디 중복확인 실패하였습니다.' });
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    let newErrors = {};
+    let newErrors: FormErrors = {};
 
     // 유효성 검사
     if (!formData.userId) newErrors.userId = '아이디를 입력하세요.';
@@ -84,25 +98,25 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
     if (Object.keys(newErrors).length === 0) {
       // 회원가입 성공 (실제로는 API 호출)
       const response = await fetch('http://localhost:8080/api/user/save', {
-        method: 'POST', 
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
-      });      
+      });
       if (response.ok) {
         const existingUsers = await response.json();
         //localStorage.setItem('users', JSON.stringify(existingUsers));
-        alert('회원가입 성공!');     
+        alert('회원가입 성공!');
         onSignupSuccess();
-      }else{
+      } else {
         alert('회원가입에 실패하였습니다.');
         return;
       }
       // 로그인 페이지로 이동 또는 다른 처리
-    }else{
-        console.log(errors);
-        alert(errors);
+    } else {
+      console.log(errors);
+      alert(errors);
     }
   };
 
@@ -226,7 +240,7 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
                 <input
                   type="checkbox"
                   checked={agreeToTerms}
-                  onChange={(e) => setAgreeToTerms(e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgreeToTerms(e.target.checked)}
                   className="mt-0.5 size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   required
                 />
@@ -238,7 +252,7 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
                 <input
                   type="checkbox"
                   checked={agreeToPrivacy}
-                  onChange={(e) => setAgreeToPrivacy(e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgreeToPrivacy(e.target.checked)}
                   className="mt-0.5 size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   required
                 />
@@ -268,22 +282,10 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
           <div className="space-y-3">
             <button type="button" className="w-full flex items-center justify-center gap-3 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
               <svg className="size-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               <span className="text-gray-700" style={{ fontWeight: 'normal' }}>Google로 가입하기</span>
             </button>
@@ -299,10 +301,10 @@ export function SignupPage({ onSignupSuccess, onSwitchToLogin }) {
           {/* 로그인 링크 */}
           <div className="mt-6 text-center">
             <span className="text-sm text-gray-600" style={{ fontWeight: 'normal' }}>이미 계정이 있으신가요? </span>
-            <button 
+            <button
               type="button"
               onClick={onSwitchToLogin}
-              className="text-sm text-blue-600 hover:text-blue-700" 
+              className="text-sm text-blue-600 hover:text-blue-700"
               style={{ fontWeight: 'normal', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             >
               로그인

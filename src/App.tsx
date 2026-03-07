@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Home, Settings, Users, FileText, Grid3x3, BarChart3, Mail, NotebookText, Map } from 'lucide-react';
+import { Home, Settings, Users, FileText, Grid3x3, BarChart3, Mail, NotebookText, Map, Clock } from 'lucide-react';
 //import { LoginPage } from '@/components/LoginPage';
-import { LoginPage } from './login/LoginPage.jsx';
-import { SignupPage } from './signUp/SignUpPage.jsx';
-import { MemoPage } from './memo/MemoPage.jsx';
-import { MindMapPage } from './mindMap/MindMapPage.jsx';
-import { MandalartPage } from './mandalart/MandalartPage.jsx';
+import { LoginPage } from './login/LoginPage.tsx';
+import { SignupPage } from './signUp/SignUpPage.tsx';
+import { MemoPage } from './memo/MemoPage.tsx';
+import { MindMapPage } from './mindMap/MindMapPage.tsx';
+import { MandalartPage } from './mandalart/MandalartPage.tsx';
 import { Header } from './frame/Header.jsx';
 import { SideBar } from './frame/SideBar.jsx';
 import { Footer } from './frame/Footer.jsx';
+import { TimeBoxPage } from './timeBox/timeBoxPage.js';
 
 export default function App() {
   const [activeMenu, setActiveMenu] = useState('home');
@@ -42,6 +43,7 @@ export default function App() {
     { id: 'memos', label: '메모장', icon: NotebookText },
     { id: 'mindMap', label: '마인드맵', icon: Map },
     { id: 'mandalart', label: '만다라트', icon: Grid3x3 },
+    { id: 'timebox', label: 'TimeBox', icon: Clock },
     //{ id: 'settings', label: '설정', icon: Settings },
   ];
 
@@ -86,6 +88,7 @@ export default function App() {
     memos: <MemoPage />,
     mindMap: <MindMapPage />,
     mandalart: <MandalartPage />,
+    timebox: <TimeBoxPage />,
   };
 
   const DefaultPage = () => (
@@ -146,7 +149,7 @@ export default function App() {
         {/* 오른쪽 메인 콘텐츠 */}
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 overflow-auto">
           <div className="h-full p-8">
-            {pageComponents[activeMenu] ?? <DefaultPage />}
+            {pageComponents[activeMenu as keyof typeof pageComponents] ?? <DefaultPage />}
           </div>
         </main>
       </div>

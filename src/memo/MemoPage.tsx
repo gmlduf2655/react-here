@@ -1,4 +1,4 @@
-import { use, useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -8,10 +8,27 @@ import {
   X,
 } from "lucide-react";
 import dayjs from 'dayjs';
-import { useRef } from "react";
+
+interface Memo {
+  memoId: string;
+  regDate: string;
+  title: string;
+  memoContent: string;
+}
+
+interface DateFilter {
+  startDate: string;
+  endDate: string;
+}
+
+interface MemoFormData {
+  regDate: string;
+  title: string;
+  memoContent: string;
+}
 
 export function MemoPage() {
-  const [memos, setMemos] = useState([
+  const [memos, setMemos] = useState<Memo[]>([
     {
       memoId: "1",
       regDate: "2026-01-23",
@@ -27,18 +44,18 @@ export function MemoPage() {
         "프로젝트 진행 상황 논의\n- 디자인 시스템 구축 완료\n- 다음 주 개발 시작",
     },
   ]);
-  const [selectedMemo, setSelectedMemo] = useState(null);
+  const [selectedMemo, setSelectedMemo] = useState<Memo | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<MemoFormData>({
     regDate: new Date().toISOString().split("T")[0],
     title: "",
     memoContent: "",
   });
-  const [dateFilter, setDateFilter] = useState({
+  const [dateFilter, setDateFilter] = useState<DateFilter>({
     startDate: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
     endDate: dayjs().format('YYYY-MM-DD'),
   });
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 날짜 필터링된 메모
   const filteredMemos = memos.filter((memo) => {
@@ -62,7 +79,7 @@ export function MemoPage() {
 
   // 날짜별로 메모 그룹화
   const groupedMemos = filteredMemos.reduce(
-    (groups, memo) => {
+    (groups: Record<string, Memo[]>, memo) => {
       const regDate = memo.regDate;
       if (!groups[regDate]) {
         groups[regDate] = [];
@@ -90,7 +107,7 @@ export function MemoPage() {
     });
   };
 
-  const handleEditMemo = (memo) => {
+  const handleEditMemo = (memo: Memo) => {
     setSelectedMemo(memo);
     setIsEditing(true);
     setFormData({
@@ -112,14 +129,14 @@ export function MemoPage() {
     try {
       const memoId = selectedMemo ? selectedMemo.memoId : "";
       const response = await fetch('http://localhost:8080/api/memo/saveMemo', {
-        method: 'POST', 
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ regDate: formData.regDate, title: formData.title, memoContent: formData.memoContent, userId: sessionStorage.getItem("userId"), memoId }),
       });
       if (response.ok) {
-        handleCancel();     
+        handleCancel();
         selectMemoData();
         alert('메모가 저장되었습니다.');
       } else {
@@ -127,23 +144,21 @@ export function MemoPage() {
       }
     } catch (error) {
       alert('네트워크 오류가 발생했습니다.');
-    }    
-    /*
-    */
+    }
   };
 
-  const handleDeleteMemo = async (id) => {
+  const handleDeleteMemo = async (id: string) => {
     if (confirm("이 메모를 삭제하시겠습니까?")) {
       try {
         const response = await fetch('http://localhost:8080/api/memo/deleteMemo', {
-          method: 'POST', 
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ memoId: id }),
         });
         if (response.ok) {
-          handleCancel();     
+          handleCancel();
           selectMemoData();
           alert('메모가 삭제되었습니다.');
         } else {
@@ -165,7 +180,7 @@ export function MemoPage() {
     });
   };
 
-  const handleSelectMemo = (memo) => {
+  const handleSelectMemo = (memo: Memo) => {
     setSelectedMemo(memo);
     setIsEditing(false);
   };
@@ -185,24 +200,23 @@ export function MemoPage() {
       const response = await fetch(`http://localhost:8080/api/memo/selectMemoList?${params}`);
       if (response.ok) {
         const data = await response.json();
-        setMemos(data); // data는 배열
+        setMemos(data);
       } else {
         setMemos([]);
       }
     } catch (error) {
-      // 네트워크 오류 시 로컬에서 로드 
       setMemos([]);
     }
-  }  
+  }
 
-  const uploadRealm = async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("userId", sessionStorage.getItem("userId"));
+  const uploadRealm = async (file: File) => {
+    const uploadForm = new FormData();
+    uploadForm.append("file", file);
+    uploadForm.append("userId", sessionStorage.getItem("userId") || '');
 
     const res = await fetch("http://localhost:3001/api/realm-to-csv", {
       method: "POST",
-      body: formData,
+      body: uploadForm,
     });
 
     const blob = await res.blob();
@@ -212,7 +226,7 @@ export function MemoPage() {
     a.href = url;
     a.download = "converted.csv";
     a.click();
-    // 3️⃣ Spring Boot로 전송
+
     const csvForm = new FormData();
     csvForm.append("file", blob, "converted.csv");
 
@@ -222,8 +236,7 @@ export function MemoPage() {
     });
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
-    }    
-    
+    }
   };
 
   return (
@@ -237,19 +250,19 @@ export function MemoPage() {
             className="hidden"
             type="file"
             accept=".realm"
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               if (e.target.files?.[0]) {
                 uploadRealm(e.target.files[0]);
               }
             }}
-          />    
+          />
           <button
-            onClick={(e)=>{fileInputRef.current?.click()}}
+            onClick={() => { fileInputRef.current?.click(); }}
             className="p-2 flex bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             title="변환"
           >
             <Plus className="size-5" /><span>realm-csv변환</span>
-          </button>              
+          </button>
           <button
             onClick={handleAddNew}
             className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -281,7 +294,7 @@ export function MemoPage() {
             <input
               type="date"
               value={dateFilter.startDate}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setDateFilter({
                   ...dateFilter,
                   startDate: e.target.value,
@@ -297,7 +310,7 @@ export function MemoPage() {
             <input
               type="date"
               value={dateFilter.endDate}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setDateFilter({
                   ...dateFilter,
                   endDate: e.target.value,
@@ -315,7 +328,7 @@ export function MemoPage() {
 
         <div className="flex-1 overflow-auto p-4 space-y-4">
           {Object.keys(groupedMemos)
-            .sort((a, b) => b.localeCompare(a)) // 최신 날짜 순
+            .sort((a, b) => b.localeCompare(a))
             .map((regDate) => (
               <div key={regDate}>
                 <div className="flex items-center gap-2 mb-2 text-sm text-gray-600 dark:text-gray-400">
@@ -325,9 +338,9 @@ export function MemoPage() {
                 <div className="space-y-2">
                   {groupedMemos[regDate].map((memo) => (
                     <div
-                      key={memo.id}
+                      key={memo.memoId}
                       className={`p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                        selectedMemo?.memoId === memo.id
+                        selectedMemo?.memoId === memo.memoId
                           ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30"
                           : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-700"
                       }`}
@@ -366,7 +379,6 @@ export function MemoPage() {
       {/* 오른쪽: 메모 상세/작성 */}
       <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
         {isEditing ? (
-          // 편집 모드
           <>
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg dark:text-white">
@@ -381,7 +393,7 @@ export function MemoPage() {
                 <input
                   type="regDate"
                   value={formData.regDate}
-                  onChange={(e) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFormData({
                       ...formData,
                       regDate: e.target.value,
@@ -397,7 +409,7 @@ export function MemoPage() {
                 <input
                   type="text"
                   value={formData.title}
-                  onChange={(e) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFormData({
                       ...formData,
                       title: e.target.value,
@@ -413,7 +425,7 @@ export function MemoPage() {
                 </label>
                 <textarea
                   value={formData.memoContent}
-                  onChange={(e) =>
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                     setFormData({
                       ...formData,
                       memoContent: e.target.value,
@@ -441,7 +453,6 @@ export function MemoPage() {
             </div>
           </>
         ) : selectedMemo ? (
-          // 메모 상세 보기
           <>
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -459,9 +470,7 @@ export function MemoPage() {
                   <Edit2 className="size-5" />
                 </button>
                 <button
-                  onClick={() =>
-                    handleDeleteMemo(selectedMemo.memoId)
-                  }
+                  onClick={() => handleDeleteMemo(selectedMemo.memoId)}
                   className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                   title="삭제"
                 >
@@ -479,7 +488,6 @@ export function MemoPage() {
             </div>
           </>
         ) : (
-          // 메모 선택 안 됨
           <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
             <div className="text-center">
               <p className="text-lg">
