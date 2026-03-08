@@ -1,21 +1,18 @@
-import { useState } from 'react';
-import { Trash2, Plus, Clock, Calendar, Check, X, FileText } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trash2, Clock, Calendar, Check, X, FileText, Plus } from 'lucide-react';
 
-interface MustToDoItem {
-  id: string;
-  text: string;
-  tag: string;
-}
+const API_BASE = 'http://localhost:8080/api/timebox';
 
 interface BrainDumpItem {
   id: string;
   text: string;
-  tag: string;
   category: string;
+  priorityYn: string;
 }
 
 interface TimeBoxItem {
   id: string;
+  dumpId: string;
   hour: number;
   startMinute: number;
   endMinute: number;
@@ -24,100 +21,183 @@ interface TimeBoxItem {
 }
 
 export function TimeBoxPage() {
+  const userId = sessionStorage.getItem('userId') || '';
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedBrainDumpIds, setSelectedBrainDumpIds] = useState<string[]>([]);
-  
+
   // 상세 모달 관련 state
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedBrainDumpForDetail, setSelectedBrainDumpForDetail] = useState<BrainDumpItem | null>(null);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([]); // "9-0", "9-30" 형식
-  const [detailText, setDetailText] = useState('');
-  const [detailColor, setDetailColor] = useState('#3b82f6'); // 기본 파란색
-  
-  const [brainDumps, setBrainDumps] = useState<BrainDumpItem[]>([
-    { id: '1', text: 'OCEAN - 해기일기가 공개시장에서 성과가 크지 않은 것은?', tag: 'MUST', category: '필수' },
-    { id: '2', text: '시계패널은 어떻게', tag: 'MUST', category: '필수' },
-    { id: '3', text: '서구팬이 이끌 뉴 만다라 마케팅 UXUI 설계가 되지 않아', tag: 'MUST', category: '필수' },
-    { id: '4', text: '개인 프로젝트', tag: 'MUST', category: '필수' },
-    { id: '5', text: '델레트리더 전부 타임즈는 브랜딩 난동', tag: 'MUST', category: '필수' },
-    { id: '6', text: '엘로나 Timebox 출시 날짜 그리고 가격', tag: 'MUST', category: '필수' },
-    { id: '7', text: '쪽 분석 예정', tag: 'MUST', category: '필수' },
-  ]);
+  const [detailColor, setDetailColor] = useState('#3b82f6');
 
-  const [timeBoxes, setTimeBoxes] = useState<TimeBoxItem[]>([
-    { id: '1', hour: 6, startMinute: 30, endMinute: 60, text: 'A-가계부 이커 도움 이유 분석하기 시작', color: '#3b82f6' },
-    { id: '2', hour: 9, startMinute: 30, endMinute: 60, text: 'A-모각코 이커 도움 권역 설정', color: '#10b981' },
-    { id: '3', hour: 14, startMinute: 30, endMinute: 60, text: 'A-가계부 이커 도움 이유 분석하기 시작', color: '#f59e0b' },
-    { id: '4', hour: 15, startMinute: 0, endMinute: 30, text: 'A-모각코 이커 도움 권역 설정', color: '#ef4444' },
-    { id: '5', hour: 15, startMinute: 30, endMinute: 60, text: 'A1-마이어팅 도구 계획 단계', color: '#8b5cf6' },
-    { id: '6', hour: 17, startMinute: 0, endMinute: 30, text: 'A1-마이어팅 돈벌기', color: '#ec4899' },
-    { id: '7', hour: 20, startMinute: 0, endMinute: 30, text: '자비 곤충', color: '#14b8a6' },
-    { id: '8', hour: 23, startMinute: 0, endMinute: 30, text: '삼성대리 만다라트 마케팅 난농 실패 누적', color: '#f97316' },
-  ]);
-
+  const [brainDumps, setBrainDumps] = useState<BrainDumpItem[]>([]);
+  const [timeBoxes, setTimeBoxes] = useState<TimeBoxItem[]>([]);
   const [newBrainDump, setNewBrainDump] = useState('');
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  const toggleBrainDumpSelection = (id: string) => {
-    if (selectedBrainDumpIds.includes(id)) {
-      // 이미 선택된 항목이면 선택 해제
-      setSelectedBrainDumpIds(selectedBrainDumpIds.filter(selectedId => selectedId !== id));
-    } else {
-      // 선택되지 않은 항목이면, 3개 미만일 때만 선택
-      if (selectedBrainDumpIds.length < 3) {
-        setSelectedBrainDumpIds([...selectedBrainDumpIds, id]);
-      }
+  // BRAIN DUMP 선택 모달 관련 state
+  const [
+    isBrainDumpSelectModalOpen,
+    setIsBrainDumpSelectModalOpen,
+  ] = useState(false);
+  const [selectedTimeSlotInfo, setSelectedTimeSlotInfo] =
+    useState<{ hour: number; startMinute: number } | null>(
+      null,
+    );
+  const [
+    selectedBrainDumpForTimeBox,
+    setSelectedBrainDumpForTimeBox,
+  ] = useState<string[]>([]);
+  const [timeBoxColor, setTimeBoxColor] = useState("#3b82f6");  
+
+  // 날짜 변경 시 데이터 재조회
+  useEffect(() => {
+    fetchBrainDumps();
+    fetchTimeBoxes();
+  }, [selectedDate]);
+
+  const fetchBrainDumps = async () => {
+    try {
+      const params = new URLSearchParams({ userId, tboxDate: selectedDate });
+      const res = await fetch(`${API_BASE}/selectBrainDumpList?${params}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const mapped: BrainDumpItem[] = data.map((d: Record<string, string>) => ({
+        id: d.dumpId,
+        text: d.dumpTitle,
+        category: '필수',
+        priorityYn: d.priorityYn || 'N',
+      }));
+      setBrainDumps(mapped);
+      // priorityYn === 'Y'인 항목을 선택 상태로 복원
+      setSelectedBrainDumpIds(mapped.filter(d => d.priorityYn === 'Y').map(d => d.id));
+    } catch (e) {
+      console.error('Brain dump 조회 실패:', e);
     }
   };
 
-  // BRAIN DUMP에서 선택된 항목들을 MUST TO DO로 변환
+  const fetchTimeBoxes = async () => {
+    try {
+      const params = new URLSearchParams({ userId, tboxDate: selectedDate });
+      const res = await fetch(`${API_BASE}/selectTimeTableList?${params}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const mapped: TimeBoxItem[] = data.map((d: Record<string, string>) => ({
+        id: d.timeTableId,
+        dumpId: d.dumpId,
+        hour: Number(d.timeHour),
+        startMinute: Number(d.timeMinute),
+        endMinute: Number(d.timeMinute) + 30,
+        text: d.dumpTitle || '',
+        color: d.color || '#3b82f6',
+      }));
+      setTimeBoxes(mapped);
+    } catch (e) {
+      console.error('TIME TABLE 조회 실패:', e);
+    }
+  };
+
+  // TOP 3 PRIORITY: 선택된 brain dump 항목
   const mustToDos = brainDumps
     .filter(item => selectedBrainDumpIds.includes(item.id))
-    .map(item => ({
-      id: item.id,
-      text: item.text,
-      tag: 'HOT!!'
-    }));
+    .map(item => ({ id: item.id, text: item.text, tag: 'HOT!!' }));
 
-  const addBrainDump = () => {
-    if (newBrainDump.trim()) {
-      setBrainDumps([...brainDumps, { id: Date.now().toString(), text: newBrainDump, tag: 'MUST', category: '필수' }]);
-      setNewBrainDump('');
+  const toggleBrainDumpSelection = async (id: string) => {
+    const isSelected = selectedBrainDumpIds.includes(id);
+    if (!isSelected && selectedBrainDumpIds.length >= 3) return;
+
+    const newPriorityYn = isSelected ? 'N' : 'Y';
+    setSelectedBrainDumpIds(prev =>
+      isSelected ? prev.filter(sid => sid !== id) : [...prev, id]
+    );
+
+    const target = brainDumps.find(d => d.id === id);
+    if (!target) return;
+    try {
+      await fetch(`${API_BASE}/saveBrainDump`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dumpId: id,
+          tboxDate: selectedDate,
+          userId,
+          dumpTitle: target.text,
+          priorityYn: newPriorityYn,
+        }),
+      });
+    } catch (e) {
+      console.error('우선순위 저장 실패:', e);
     }
   };
 
-  const deleteBrainDump = (id: string) => {
-    setBrainDumps(brainDumps.filter(item => item.id !== id));
-    // 삭제된 항목이 선택되어 있었다면 선택에서도 제거
-    setSelectedBrainDumpIds(selectedBrainDumpIds.filter(selectedId => selectedId !== id));
+  // 새로운 brain dump 추가
+  const addBrainDump = async () => {
+    if (!newBrainDump.trim()) return;
+    try {
+      await fetch(`${API_BASE}/saveBrainDump`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tboxDate: selectedDate,
+          userId,
+          dumpTitle: newBrainDump.trim(),
+          priorityYn: 'N',
+          status: '1',
+        }),
+      });
+      setNewBrainDump('');
+      fetchBrainDumps();
+    } catch (e) {
+      console.error('Brain dump 추가 실패:', e);
+    }
   };
 
-  const addTimeBox = (hour: number, startMinute: number) => {
-    const newId = Date.now().toString();
-    setTimeBoxes([...timeBoxes, {
-      id: newId,
-      hour,
-      startMinute,
-      endMinute: startMinute === 0 ? 30 : 60,
-      text: '',
-      color: '#3b82f6'
-    }]);
+  const deleteBrainDump = async (id: string) => {
+    try {
+      await fetch(`${API_BASE}/deleteBrainDump`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dumpId: id }),
+      });
+      // ON DELETE CASCADE로 연결된 time table도 DB에서 자동 삭제
+      setBrainDumps(prev => prev.filter(item => item.id !== id));
+      setSelectedBrainDumpIds(prev => prev.filter(sid => sid !== id));
+      setTimeBoxes(prev => prev.filter(tb => tb.dumpId !== id));
+    } catch (e) {
+      console.error('Brain dump 삭제 실패:', e);
+    }
   };
 
-  const updateTimeBox = (id: string, text: string) => {
-    setTimeBoxes(timeBoxes.map(item => 
-      item.id === id ? { ...item, text } : item
-    ));
+  const deleteTimeBox = async (id: string) => {
+    try {
+      await fetch(`${API_BASE}/deleteTimeTable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timeTableId: id }),
+      });
+      setTimeBoxes(prev => prev.filter(item => item.id !== id));
+    } catch (e) {
+      console.error('TIME TABLE 삭제 실패:', e);
+    }
   };
 
-  const deleteTimeBox = (id: string) => {
-    setTimeBoxes(timeBoxes.filter(item => item.id !== id));
-  };
-
-  const resetTimeBox = () => {
-    if (confirm('TIME BOX를 초기화하시겠습니까?')) {
+  const resetTimeBox = async () => {
+    if (!confirm('TIME TABLE를 초기화하시겠습니까?')) return;
+    try {
+      await Promise.all(
+        timeBoxes.map(tb =>
+          fetch(`${API_BASE}/deleteTimeTable`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timeTableId: tb.id }),
+          })
+        )
+      );
       setTimeBoxes([]);
+    } catch (e) {
+      console.error('TIME TABLE 초기화 실패:', e);
     }
   };
 
@@ -127,43 +207,48 @@ export function TimeBoxPage() {
 
   const openDetailModal = (item: BrainDumpItem) => {
     setSelectedBrainDumpForDetail(item);
-    setDetailText(item.text);
     setIsDetailModalOpen(true);
   };
 
   const closeDetailModal = () => {
     setIsDetailModalOpen(false);
     setSelectedBrainDumpForDetail(null);
-    setDetailText('');
     setSelectedTimeSlots([]);
     setDetailColor('#3b82f6');
   };
 
-  const saveDetailToTimeBox = () => {
-    if (detailText.trim() && selectedTimeSlots.length > 0) {
-      const newTimeBoxes = selectedTimeSlots.map((slot) => {
-        const [hour, minute] = slot.split('-').map(Number);
-        return {
-          id: Date.now().toString() + '-' + slot,
-          hour,
-          startMinute: minute,
-          endMinute: minute === 0 ? 30 : 60,
-          text: detailText,
-          color: detailColor
-        };
-      });
-      setTimeBoxes([...timeBoxes, ...newTimeBoxes]);
+  const saveDetailToTimeBox = async () => {
+    if (!selectedBrainDumpForDetail || selectedTimeSlots.length === 0) return;
+    try {
+      await Promise.all(
+        selectedTimeSlots.map(slot => {
+          const [hour, minute] = slot.split('-').map(Number);
+          return fetch(`${API_BASE}/saveTimeTable`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              dumpId: selectedBrainDumpForDetail.id,
+              tboxDate: selectedDate,
+              userId,
+              timeHour: hour,
+              timeMinute: minute,
+              color: detailColor,
+            }),
+          });
+        })
+      );
       closeDetailModal();
+      fetchTimeBoxes();
+    } catch (e) {
+      console.error('TIME TABLE 저장 실패:', e);
     }
   };
 
   const toggleTimeSlot = (hour: number, minute: number) => {
     const slotKey = `${hour}-${minute}`;
-    if (selectedTimeSlots.includes(slotKey)) {
-      setSelectedTimeSlots(selectedTimeSlots.filter(s => s !== slotKey));
-    } else {
-      setSelectedTimeSlots([...selectedTimeSlots, slotKey]);
-    }
+    setSelectedTimeSlots(prev =>
+      prev.includes(slotKey) ? prev.filter(s => s !== slotKey) : [...prev, slotKey]
+    );
   };
 
   const isTimeSlotSelected = (hour: number, minute: number) => {
@@ -181,15 +266,44 @@ export function TimeBoxPage() {
     { name: '주황색', color: '#f97316' },
   ];
 
+  const openBrainDumpSelectModal = (
+    hour: number,
+    startMinute: number,
+  ) => {
+    setSelectedTimeSlotInfo({ hour, startMinute });
+    setIsBrainDumpSelectModalOpen(true);
+  };  
+
+  const closeBrainDumpSelectModal = () => {
+    setIsBrainDumpSelectModalOpen(false);
+    setSelectedTimeSlotInfo(null);
+    setSelectedBrainDumpForTimeBox([]);
+    setTimeBoxColor("#3b82f6");
+  };
+
+  // 로직추가 필요
+  const addBrainDumpToTimeBox = () => {
+    if (selectedBrainDumpForTimeBox && selectedTimeSlotInfo) {
+      const { hour, startMinute } = selectedTimeSlotInfo;
+      const brainDumpItem = brainDumps.find(
+        (item) => item.id === selectedBrainDumpForTimeBox[0],
+      );
+      if (brainDumpItem) {
+
+        closeBrainDumpSelectModal();
+      }
+    }
+  };  
+
   return (
     <div className="h-full flex gap-6 bg-gray-50 dark:bg-gray-900">
       {/* 왼쪽 섹션 */}
       <div className="w-1/3 flex flex-col gap-6">
-        {/* MUST TO DO */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1 flex flex-col">
+        {/* TOP 3 PRIORITY */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-[1] flex flex-col">
           <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="size-2 bg-red-500 rounded-full"></div>
-            <h2 className="text-lg font-semibold dark:text-white">MUST TO DO</h2>
+            <h2 className="text-lg font-semibold dark:text-white">TOP 3 PRIORITY</h2>
             <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
               {mustToDos.length}/3 선택됨
             </span>
@@ -220,7 +334,7 @@ export function TimeBoxPage() {
         </div>
 
         {/* BRAIN DUMP */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1 flex flex-col">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-[2] flex flex-col">
           <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="size-2 bg-yellow-500 rounded-full"></div>
             <h2 className="text-lg font-semibold dark:text-white">BRAIN DUMP</h2>
@@ -233,13 +347,13 @@ export function TimeBoxPage() {
               {brainDumps.map((item) => {
                 const isSelected = selectedBrainDumpIds.includes(item.id);
                 const canSelect = selectedBrainDumpIds.length < 3 || isSelected;
-                
+
                 return (
-                  <div 
-                    key={item.id} 
+                  <div
+                    key={item.id}
                     className={`flex items-start gap-3 group p-2 rounded-lg transition-colors ${
-                      isSelected 
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
+                      isSelected
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     }`}
                   >
@@ -268,16 +382,18 @@ export function TimeBoxPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => openDetailModal(item)}
-                          className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-colors"
-                          title="상세 정보 추가"
+                          className="flex items-center gap-1 px-2 py-1 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-colors text-blue-600 dark:text-blue-400"
+                          title="상세 보기"
                         >
-                          <FileText className="size-5 text-blue-600 dark:text-blue-400" />
+                          <FileText className="size-5" />
+                          <span className="text-xs font-medium">상세</span>
                         </button>
                         <button
                           onClick={() => deleteBrainDump(item.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-opacity"
+                          className="flex items-center gap-1 px-2 py-1 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors text-red-600 dark:text-red-400"
                         >
-                          <Trash2 className="size-3 text-gray-400" />
+                          <Trash2 className="size-5 text-red-400" />
+                          <span className="text-xs font-medium">삭제</span>
                         </button>
                       </div>
                     </div>
@@ -290,7 +406,7 @@ export function TimeBoxPage() {
                 type="text"
                 value={newBrainDump}
                 onChange={(e) => setNewBrainDump(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addBrainDump()}
+                onKeyDown={(e) => e.key === 'Enter' && addBrainDump()}
                 placeholder="+ 새 항목 추가"
                 className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -299,12 +415,12 @@ export function TimeBoxPage() {
         </div>
       </div>
 
-      {/* 오른쪽 TIME BOX */}
+      {/* 오른쪽 TIME TABLE */}
       <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <div className="size-2 bg-orange-500 rounded-full"></div>
-            <h2 className="text-lg font-semibold dark:text-white">TIME BOX</h2>
+            <h2 className="text-lg font-semibold dark:text-white">TIME TABLE</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -316,23 +432,11 @@ export function TimeBoxPage() {
                 className="bg-transparent border border-gray-200 dark:border-gray-700 px-2 py-1 rounded dark:text-white"
               />
             </div>
-            <button
-              onClick={resetTimeBox}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              새로 만들기
-            </button>
           </div>
         </div>
 
         <div className="flex items-center gap-4 px-6 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
           <div className="text-sm font-medium dark:text-white">RESET</div>
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <div className="flex items-center gap-1">
-              <input type="radio" name="duration" id="30min" defaultChecked />
-              <label htmlFor="30min">30-60min</label>
-            </div>
-          </div>
         </div>
 
         <div className="flex-1 overflow-auto">
@@ -364,24 +468,22 @@ export function TimeBoxPage() {
                                 </div>
                                 <button
                                   onClick={() => deleteTimeBox(tb.id)}
-                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
+                                  className="ml-auto opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
                                 >
                                   <Trash2 className="size-3 text-gray-400" />
                                 </button>
                               </div>
-                              <input
-                                type="text"
-                                value={tb.text}
-                                onChange={(e) => updateTimeBox(tb.id, e.target.value)}
-                                placeholder="할 일 입력..."
-                                className="w-full mt-1 px-2 py-1 text-sm bg-transparent border-none outline-none dark:text-gray-200"
-                              />
+                              <p className="mt-1 px-2 py-1 text-sm dark:text-gray-200 truncate">
+                                {tb.text}
+                              </p>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <button
-                          onClick={() => addTimeBox(hour, 0)}
+                          onClick={() =>
+                            openBrainDumpSelectModal(hour, 0)
+                          }
                           className="w-full h-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <Plus className="size-4" />
@@ -389,7 +491,7 @@ export function TimeBoxPage() {
                       )}
                     </div>
 
-                    {/* 30-60분 */}
+                    {/* 30-00분 */}
                     <div className="min-h-[60px] border border-gray-200 dark:border-gray-700 rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
                       {getTimeBoxesForSlot(hour, 30).length > 0 ? (
                         <div className="space-y-1">
@@ -402,28 +504,35 @@ export function TimeBoxPage() {
                               <div className="flex items-start gap-2">
                                 <div className="flex items-center gap-1 text-xs flex-shrink-0" style={{ color: tb.color }}>
                                   <Clock className="size-3" />
-                                  <span>{hour}:{String(tb.startMinute).padStart(2, '0')}-{hour}:{String(tb.endMinute).padStart(2, '0')}</span>
+                                  <span>
+                                    {hour}:
+                                    {String(
+                                      tb.startMinute,
+                                    ).padStart(2, "0")}
+                                    -{tb.endMinute === 60 ? hour + 1 : hour}:
+                                    {String(
+                                      tb.endMinute === 60 ? 0 : tb.endMinute,
+                                    ).padStart(2, "0")}
+                                  </span>
                                 </div>
                                 <button
                                   onClick={() => deleteTimeBox(tb.id)}
-                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
+                                  className="ml-auto opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
                                 >
                                   <Trash2 className="size-3 text-gray-400" />
                                 </button>
                               </div>
-                              <input
-                                type="text"
-                                value={tb.text}
-                                onChange={(e) => updateTimeBox(tb.id, e.target.value)}
-                                placeholder="할 일 입력..."
-                                className="w-full mt-1 px-2 py-1 text-sm bg-transparent border-none outline-none dark:text-gray-200"
-                              />
+                              <p className="mt-1 px-2 py-1 text-sm dark:text-gray-200 truncate">
+                                {tb.text}
+                              </p>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <button
-                          onClick={() => addTimeBox(hour, 30)}
+                          onClick={() =>
+                            openBrainDumpSelectModal(hour, 0)
+                          }
                           className="w-full h-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <Plus className="size-4" />
@@ -440,10 +549,10 @@ export function TimeBoxPage() {
 
       {/* 상세 모달 */}
       {isDetailModalOpen && (
-        <div className="fixed inset-0 bg-opacity-10 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold dark:text-white">TIME BOX에 추가</h3>
+              <h3 className="text-lg font-semibold dark:text-white">TIME TABLE에 추가</h3>
               <button
                 onClick={closeDetailModal}
                 className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -451,6 +560,15 @@ export function TimeBoxPage() {
                 <X className="size-5" />
               </button>
             </div>
+
+            {/* 선택된 brain dump 표시 */}
+            {selectedBrainDumpForDetail && (
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                  {selectedBrainDumpForDetail.text}
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* 시간 선택 */}
@@ -503,13 +621,13 @@ export function TimeBoxPage() {
                           const [bH, bM] = b.split('-').map(Number);
                           return aH === bH ? aM - bM : aH - bH;
                         }).map((slot) => {
-                          const [hour, minute] = slot.split('-').map(Number);
+                          const [h, m] = slot.split('-').map(Number);
                           return (
                             <span
                               key={slot}
                               className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
                             >
-                              {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
+                              {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}
                             </span>
                           );
                         })}
@@ -548,20 +666,6 @@ export function TimeBoxPage() {
                 </div>
               </div>
 
-              {/* 상세 내용 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  할 일 내용
-                </label>
-                <textarea
-                  value={detailText}
-                  onChange={(e) => setDetailText(e.target.value)}
-                  placeholder="할 일을 입력하세요..."
-                  rows={4}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
               {/* 버튼 */}
               <div className="flex justify-end gap-2 pt-2">
                 <button
@@ -572,15 +676,160 @@ export function TimeBoxPage() {
                 </button>
                 <button
                   onClick={saveDetailToTimeBox}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={selectedTimeSlots.length === 0}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  TIME BOX에 추가
+                  TIME TABLE에 추가
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {/* BRAIN DUMP 선택 모달 */}
+      {isBrainDumpSelectModalOpen && (
+        <div className="fixed inset-0 bg-opacity-10 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold dark:text-white">
+                TIME TABLE에 추가
+              </h3>
+              <button
+                onClick={closeBrainDumpSelectModal}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* 시간 표시 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  선택된 시간
+                </label>
+                <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 text-sm dark:text-gray-200">
+                    <Clock className="size-4 text-blue-600 dark:text-blue-400" />
+                    <span className="font-medium">
+                      {String(
+                        selectedTimeSlotInfo?.hour || 0,
+                      ).padStart(2, "0")}
+                      :
+                      {String(
+                        selectedTimeSlotInfo?.startMinute || 0,
+                      ).padStart(2, "0")}{" "}
+                      -{" "}
+                      {selectedTimeSlotInfo?.startMinute === 0
+                        ? String(selectedTimeSlotInfo?.hour || 0).padStart(2, "0")
+                        : String((selectedTimeSlotInfo?.hour || 0) + 1).padStart(2, "0")}
+                      :
+                      {selectedTimeSlotInfo?.startMinute === 0
+                        ? "30"
+                        : "00"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* BRAIN DUMP 선택 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  BRAIN DUMP 선택 (복수 선택 가능)
+                </label>
+                <div className="max-h-[300px] overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                  <div className="space-y-1">
+                    {brainDumps.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() =>
+                          setSelectedBrainDumpForTimeBox(
+                            (prev) =>
+                              prev.includes(item.id)
+                                ? prev.filter(
+                                    (id) => id !== item.id,
+                                  )
+                                : [...prev, item.id],
+                          )
+                        }
+                        className={`w-full text-left flex items-start gap-3 p-2 rounded-lg transition-colors ${
+                          selectedBrainDumpForTimeBox.includes(
+                            item.id,
+                          )
+                            ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <div
+                          className={`mt-0.5 size-5 border-2 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                            selectedBrainDumpForTimeBox.includes(
+                              item.id,
+                            )
+                              ? "bg-blue-600 border-blue-600"
+                              : "border-gray-300 dark:border-gray-600"
+                          }`}
+                        >
+                          {selectedBrainDumpForTimeBox.includes(
+                            item.id,
+                          ) && (
+                            <div className="size-2 bg-white rounded-full"></div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {item.category}
+                            </span>
+                          </div>
+                          <div
+                            className={`text-sm ${
+                              selectedBrainDumpForTimeBox.includes(
+                                item.id,
+                              )
+                                ? "font-medium dark:text-white"
+                                : "dark:text-gray-200"
+                            }`}
+                          >
+                            {item.text}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {selectedBrainDumpForTimeBox.length === 0 ? (
+                  <div className="mt-2 text-xs text-red-500">
+                    최소 1개 항목을 선택해주세요
+                  </div>
+                ) : (
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium">
+                      {selectedBrainDumpForTimeBox.length}개
+                      항목 선택됨
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* 버튼 */}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={closeBrainDumpSelectModal}
+                  className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={addBrainDumpToTimeBox}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  TIME TABLE에 추가
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}      
     </div>
   );
 }

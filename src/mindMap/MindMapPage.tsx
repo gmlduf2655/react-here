@@ -6,7 +6,8 @@ import {
   X,
 } from "lucide-react";
 import dayjs from 'dayjs';
-import { default as MindMap } from "./MindMap.jsx";
+import MindMapRaw from "./MindMap.jsx";
+import type React from "react";
 
 interface Memo {
   memoId: string;
@@ -32,6 +33,10 @@ interface MindMapData {
   };
   linkData: unknown[];
 }
+
+const MindMap = MindMapRaw as React.ForwardRefExoticComponent<
+  { data: MindMapData } & React.RefAttributes<MindMapRef>
+>;
 
 export function MindMapPage() {
   const mindMapRef = useRef<MindMapRef | null>(null);
