@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Trash2, Clock, Calendar, Check, X, FileText, Plus } from 'lucide-react';
+import { Trash2, Clock, Calendar, Check, FileText, Plus } from 'lucide-react';
+import { BrainDumpDetailModal } from './brainDumpDetailModal';
+import { BrainDumpSelectModal } from './brainDumpSelectModal';
 
 const API_BASE = 'http://localhost:8080/api/timebox';
 
-interface BrainDumpItem {
+export interface BrainDumpItem {
   id: string;
   text: string;
   category: string;
   priorityYn: string;
+  completeYn: string;
 }
 
 interface TimeBoxItem {
@@ -34,23 +37,14 @@ export function TimeBoxPage() {
   const [brainDumps, setBrainDumps] = useState<BrainDumpItem[]>([]);
   const [timeBoxes, setTimeBoxes] = useState<TimeBoxItem[]>([]);
   const [newBrainDump, setNewBrainDump] = useState('');
+  const [checkedForDelete, setCheckedForDelete] = useState<string[]>([]);
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   // BRAIN DUMP 선택 모달 관련 state
-  const [
-    isBrainDumpSelectModalOpen,
-    setIsBrainDumpSelectModalOpen,
-  ] = useState(false);
-  const [selectedTimeSlotInfo, setSelectedTimeSlotInfo] =
-    useState<{ hour: number; startMinute: number } | null>(
-      null,
-    );
-  const [
-    selectedBrainDumpForTimeBox,
-    setSelectedBrainDumpForTimeBox,
-  ] = useState<string[]>([]);
-  const [timeBoxColor, setTimeBoxColor] = useState("#3b82f6");  
+  const [isBrainDumpSelectModalOpen, setIsBrainDumpSelectModalOpen] = useState(false);
+  const [selectedTimeSlotInfo, setSelectedTimeSlotInfo] = useState<{ hour: number; startMinute: number } | null>(null);
+  const [selectedBrainDumpForTimeBox, setSelectedBrainDumpForTimeBox] = useState<string[]>([]);
 
   // 날짜 변경 시 데이터 재조회
   useEffect(() => {
@@ -69,6 +63,7 @@ export function TimeBoxPage() {
         text: d.dumpTitle,
         category: '필수',
         priorityYn: d.priorityYn || 'N',
+        completeYn: d.completeYn || 'N',
       }));
       setBrainDumps(mapped);
       // priorityYn === 'Y'인 항목을 선택 상태로 복원
@@ -154,19 +149,47 @@ export function TimeBoxPage() {
     }
   };
 
-  const deleteBrainDump = async (id: string) => {
+  const deleteCheckedBrainDumps = async () => {
+    if (checkedForDelete.length === 0) return;
     try {
-      await fetch(`${API_BASE}/deleteBrainDump`, {
+      await fetch(`${API_BASE}/deleteBrainDumpList`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dumpId: id }),
+        body: JSON.stringify({ dumpIds: checkedForDelete }),
       });
       // ON DELETE CASCADE로 연결된 time table도 DB에서 자동 삭제
-      setBrainDumps(prev => prev.filter(item => item.id !== id));
-      setSelectedBrainDumpIds(prev => prev.filter(sid => sid !== id));
-      setTimeBoxes(prev => prev.filter(tb => tb.dumpId !== id));
+      setBrainDumps(prev => prev.filter(item => !checkedForDelete.includes(item.id)));
+      setSelectedBrainDumpIds(prev => prev.filter(sid => !checkedForDelete.includes(sid)));
+      setTimeBoxes(prev => prev.filter(tb => !checkedForDelete.includes(tb.dumpId)));
+      setCheckedForDelete([]);
     } catch (e) {
       console.error('Brain dump 삭제 실패:', e);
+    }
+  };
+
+  const toggleComplete = async (item: BrainDumpItem) => {
+    const newcompleteYn = item.completeYn === 'Y' ? 'N' : 'Y';
+    setBrainDumps(prev =>
+      prev.map(d => d.id === item.id ? { ...d, completeYn: newcompleteYn } : d)
+    );
+    try {
+      await fetch(`${API_BASE}/saveBrainDump`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dumpId: item.id,
+          tboxDate: selectedDate,
+          userId,
+          dumpTitle: item.text,
+          priorityYn: item.priorityYn,
+          completeYn: newcompleteYn,
+        }),
+      });
+    } catch (e) {
+      console.error('완료여부 저장 실패:', e);
+      setBrainDumps(prev =>
+        prev.map(d => d.id === item.id ? { ...d, completeYn: item.completeYn } : d)
+      );
     }
   };
 
@@ -205,8 +228,24 @@ export function TimeBoxPage() {
     return timeBoxes.filter(tb => tb.hour === hour && tb.startMinute === startMinute);
   };
 
-  const openDetailModal = (item: BrainDumpItem) => {
+  const openDetailModal = async (item: BrainDumpItem) => {
     setSelectedBrainDumpForDetail(item);
+
+    try {
+      var userId = sessionStorage.getItem('userId') || '';
+      const params = new URLSearchParams({ dumpId: item.id, userId });
+      const res = await fetch(`${API_BASE}/selectTimeTableByDumpId?${params}`);
+      if (res.ok) {
+        const data: Record<string, string>[] = await res.json();
+        setSelectedTimeSlots(data.map((d) => `${d.timeHour}-${d.timeMinute}`));
+        if (data.length > 0 && data[0].color) {
+          setDetailColor(data[0].color);
+        }
+      }
+    } catch (e) {
+      console.error('시간 설정 조회 실패:', e);
+    }
+
     setIsDetailModalOpen(true);
   };
 
@@ -233,6 +272,8 @@ export function TimeBoxPage() {
               timeHour: hour,
               timeMinute: minute,
               color: detailColor,
+              dumpContent: selectedBrainDumpForDetail.text,
+              completeYn: selectedBrainDumpForDetail.completeYn
             }),
           });
         })
@@ -251,49 +292,28 @@ export function TimeBoxPage() {
     );
   };
 
-  const isTimeSlotSelected = (hour: number, minute: number) => {
-    return selectedTimeSlots.includes(`${hour}-${minute}`);
-  };
-
-  const predefinedColors = [
-    { name: '파란색', color: '#3b82f6' },
-    { name: '초록색', color: '#10b981' },
-    { name: '노란색', color: '#f59e0b' },
-    { name: '빨간색', color: '#ef4444' },
-    { name: '보라색', color: '#8b5cf6' },
-    { name: '핑크색', color: '#ec4899' },
-    { name: '청록색', color: '#14b8a6' },
-    { name: '주황색', color: '#f97316' },
-  ];
-
-  const openBrainDumpSelectModal = (
-    hour: number,
-    startMinute: number,
-  ) => {
+  const openBrainDumpSelectModal = (hour: number, startMinute: number) => {
     setSelectedTimeSlotInfo({ hour, startMinute });
     setIsBrainDumpSelectModalOpen(true);
-  };  
+  };
 
   const closeBrainDumpSelectModal = () => {
     setIsBrainDumpSelectModalOpen(false);
     setSelectedTimeSlotInfo(null);
     setSelectedBrainDumpForTimeBox([]);
-    setTimeBoxColor("#3b82f6");
   };
 
   // 로직추가 필요
   const addBrainDumpToTimeBox = () => {
-    if (selectedBrainDumpForTimeBox && selectedTimeSlotInfo) {
-      const { hour, startMinute } = selectedTimeSlotInfo;
+    if (selectedBrainDumpForTimeBox.length > 0 && selectedTimeSlotInfo) {
       const brainDumpItem = brainDumps.find(
         (item) => item.id === selectedBrainDumpForTimeBox[0],
       );
       if (brainDumpItem) {
-
         closeBrainDumpSelectModal();
       }
     }
-  };  
+  };
 
   return (
     <div className="h-full flex gap-6 bg-gray-50 dark:bg-gray-900">
@@ -334,13 +354,42 @@ export function TimeBoxPage() {
         </div>
 
         {/* BRAIN DUMP */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-[2] flex flex-col">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-[3] flex flex-col">
           <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="size-2 bg-yellow-500 rounded-full"></div>
             <h2 className="text-lg font-semibold dark:text-white">BRAIN DUMP</h2>
             <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
               3개까지 선택 가능
             </span>
+            <button
+              onClick={deleteCheckedBrainDumps}
+              disabled={checkedForDelete.length === 0}
+              className="flex items-center justify-center w-16 px-2 py-1 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors text-red-600 dark:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="size-5 text-red-400" />
+              <span className="text-sm text-red-500 dark:text-red-400">삭제</span>
+            </button>
+          </div>
+
+          {/* 헤더 */}
+          <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+            <div className="flex items-center gap-3">
+              <div className="w-8 text-sm font-medium text-gray-600 dark:text-gray-400 text-center flex-shrink-0">
+                선택
+              </div>
+              <div className="flex-1 text-sm font-medium text-gray-600 dark:text-gray-400">
+                제목
+              </div>
+              <div className="w-12 text-sm font-medium text-gray-600 dark:text-gray-400 text-center flex-shrink-0">
+                Top 3
+              </div>
+              <div className="w-12 text-sm font-medium text-gray-600 dark:text-gray-400 text-center flex-shrink-0">
+                완료
+              </div>
+              <div className="w-12 text-sm font-medium text-gray-600 dark:text-gray-400 text-center flex-shrink-0">
+                상세
+              </div>
+            </div>
           </div>
           <div className="p-4 flex-1 overflow-auto">
             <div className="space-y-2">
@@ -351,51 +400,83 @@ export function TimeBoxPage() {
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-start gap-3 group p-2 rounded-lg transition-colors ${
+                    className={`flex items-start gap-3 group p-0 rounded-lg transition-colors ${
                       isSelected
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                        ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     }`}
                   >
-                    <button
-                      onClick={() => toggleBrainDumpSelection(item.id)}
-                      disabled={!canSelect}
-                      className={`mt-0.5 size-5 border-2 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                        isSelected
-                          ? 'bg-blue-600 border-blue-600'
-                          : canSelect
-                          ? 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
-                          : 'border-gray-200 dark:border-gray-700 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      {isSelected && <Check className="size-3 text-white" />}
-                    </button>
-                    <div className="flex-1 flex items-start gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{item.category}</span>
-                        </div>
-                        <div className={`text-sm ${isSelected ? 'font-medium dark:text-white' : 'dark:text-gray-200'}`}>
-                          {item.text}
-                        </div>
+                    {/* 선택 체크박스 (삭제용) */}
+                    <div className="w-8 flex items-start justify-center">
+                      <button
+                        onClick={() =>
+                          setCheckedForDelete(prev =>
+                            prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                          )
+                        }
+                        className={`mt-0.5 size-5 border-2 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                          checkedForDelete.includes(item.id)
+                            ? "bg-red-500 border-red-500"
+                            : "border-gray-300 dark:border-gray-600 hover:border-red-400"
+                        }`}
+                      >
+                        {checkedForDelete.includes(item.id) && (
+                          <Check className="size-3 text-white" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* 제목 */}
+                    <div className="flex-1">
+                      <div className={`text-sm ${isSelected ? "font-medium dark:text-white" : "dark:text-gray-200"}`}>
+                        {item.text}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openDetailModal(item)}
-                          className="flex items-center gap-1 px-2 py-1 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-colors text-blue-600 dark:text-blue-400"
-                          title="상세 보기"
-                        >
-                          <FileText className="size-5" />
-                          <span className="text-xs font-medium">상세</span>
-                        </button>
-                        <button
-                          onClick={() => deleteBrainDump(item.id)}
-                          className="flex items-center gap-1 px-2 py-1 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors text-red-600 dark:text-red-400"
-                        >
-                          <Trash2 className="size-5 text-red-400" />
-                          <span className="text-xs font-medium">삭제</span>
-                        </button>
-                      </div>
+                    </div>
+
+                    {/* Top 3 체크박스 */}
+                    <div className="w-12 flex items-start justify-center">
+                      <button
+                        onClick={() => toggleBrainDumpSelection(item.id)}
+                        disabled={!canSelect}
+                        className={`mt-0.5 size-5 border-2 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                          isSelected
+                            ? "bg-blue-600 border-blue-600"
+                            : canSelect
+                              ? "border-gray-300 dark:border-gray-600 hover:border-blue-400"
+                              : "border-gray-200 dark:border-gray-700 opacity-50 cursor-not-allowed"
+                        }`}
+                      >
+                        {isSelected && (
+                          <Check className="size-3 text-white" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* 완료 체크박스 */}
+                    <div className="w-12 flex items-start justify-center">
+                      <button
+                        onClick={() => toggleComplete(item)}
+                        className={`mt-0.5 size-5 border-2 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                          item.completeYn === 'Y'
+                            ? "bg-green-500 border-green-500"
+                            : "border-gray-300 dark:border-gray-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
+                        }`}
+                      >
+                        {item.completeYn === 'Y' && (
+                          <Check className="size-3 text-white" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* 상세 버튼 */}
+                    <div className="w-12 flex items-start justify-center">
+                      <button
+                        onClick={() => openDetailModal(item)}
+                        className="flex items-center justify-center w-16 px-2 py-1 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-colors text-blue-600 dark:text-blue-400"
+                        title="상세 보기"
+                      >
+                        <FileText className="size-5" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -436,7 +517,12 @@ export function TimeBoxPage() {
         </div>
 
         <div className="flex items-center gap-4 px-6 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-          <div className="text-sm font-medium dark:text-white">RESET</div>
+          <button
+            onClick={resetTimeBox}
+            className="text-sm font-medium dark:text-white"
+          >
+            RESET
+          </button>
         </div>
 
         <div className="flex-1 overflow-auto">
@@ -481,9 +567,7 @@ export function TimeBoxPage() {
                         </div>
                       ) : (
                         <button
-                          onClick={() =>
-                            openBrainDumpSelectModal(hour, 0)
-                          }
+                          onClick={() => openBrainDumpSelectModal(hour, 0)}
                           className="w-full h-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <Plus className="size-4" />
@@ -505,14 +589,8 @@ export function TimeBoxPage() {
                                 <div className="flex items-center gap-1 text-xs flex-shrink-0" style={{ color: tb.color }}>
                                   <Clock className="size-3" />
                                   <span>
-                                    {hour}:
-                                    {String(
-                                      tb.startMinute,
-                                    ).padStart(2, "0")}
-                                    -{tb.endMinute === 60 ? hour + 1 : hour}:
-                                    {String(
-                                      tb.endMinute === 60 ? 0 : tb.endMinute,
-                                    ).padStart(2, "0")}
+                                    {hour}:{String(tb.startMinute).padStart(2, '0')}
+                                    -{tb.endMinute === 60 ? hour + 1 : hour}:{String(tb.endMinute === 60 ? 0 : tb.endMinute).padStart(2, '0')}
                                   </span>
                                 </div>
                                 <button
@@ -530,9 +608,7 @@ export function TimeBoxPage() {
                         </div>
                       ) : (
                         <button
-                          onClick={() =>
-                            openBrainDumpSelectModal(hour, 0)
-                          }
+                          onClick={() => openBrainDumpSelectModal(hour, 30)}
                           className="w-full h-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <Plus className="size-4" />
@@ -547,289 +623,29 @@ export function TimeBoxPage() {
         </div>
       </div>
 
-      {/* 상세 모달 */}
-      {isDetailModalOpen && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold dark:text-white">TIME TABLE에 추가</h3>
-              <button
-                onClick={closeDetailModal}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            {/* 선택된 brain dump 표시 */}
-            {selectedBrainDumpForDetail && (
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
-                  {selectedBrainDumpForDetail.text}
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              {/* 시간 선택 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  시간 선택 (여러 시간대 선택 가능)
-                </label>
-                <div className="max-h-[300px] overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2">
-                  <div className="space-y-1">
-                    {hours.map((hour) => (
-                      <div key={hour} className="flex items-center gap-2">
-                        <div className="w-12 text-sm text-gray-600 dark:text-gray-400 flex-shrink-0">
-                          {hour}시
-                        </div>
-                        <div className="flex-1 flex gap-2">
-                          <label className="flex-1 flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={isTimeSlotSelected(hour, 0)}
-                              onChange={() => toggleTimeSlot(hour, 0)}
-                              className="cursor-pointer"
-                            />
-                            <span className="text-sm dark:text-gray-300">
-                              {String(hour).padStart(2, '0')}:00 - {String(hour).padStart(2, '0')}:30
-                            </span>
-                          </label>
-                          <label className="flex-1 flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={isTimeSlotSelected(hour, 30)}
-                              onChange={() => toggleTimeSlot(hour, 30)}
-                              className="cursor-pointer"
-                            />
-                            <span className="text-sm dark:text-gray-300">
-                              {String(hour).padStart(2, '0')}:30 - {String(hour + 1).padStart(2, '0')}:00
-                            </span>
-                          </label>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  {selectedTimeSlots.length > 0 ? (
-                    <div>
-                      <span className="font-medium">{selectedTimeSlots.length}개 시간대 선택됨</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {selectedTimeSlots.sort((a, b) => {
-                          const [aH, aM] = a.split('-').map(Number);
-                          const [bH, bM] = b.split('-').map(Number);
-                          return aH === bH ? aM - bM : aH - bH;
-                        }).map((slot) => {
-                          const [h, m] = slot.split('-').map(Number);
-                          return (
-                            <span
-                              key={slot}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
-                            >
-                              {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-red-500">최소 1개의 시간대를 선택해주세요</div>
-                  )}
-                </div>
-              </div>
-
-              {/* 색상 선택 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  색상 선택
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {predefinedColors.map((colorOption) => (
-                    <button
-                      key={colorOption.color}
-                      onClick={() => setDetailColor(colorOption.color)}
-                      className={`p-3 rounded-lg border-2 transition-all ${
-                        detailColor === colorOption.color
-                          ? 'border-gray-900 dark:border-white scale-105'
-                          : 'border-transparent hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: colorOption.color + '40' }}
-                      title={colorOption.name}
-                    >
-                      <div
-                        className="w-full h-6 rounded"
-                        style={{ backgroundColor: colorOption.color }}
-                      ></div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 버튼 */}
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={closeDetailModal}
-                  className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={saveDetailToTimeBox}
-                  disabled={selectedTimeSlots.length === 0}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  TIME TABLE에 추가
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* BRAIN DUMP 선택 모달 */}
-      {isBrainDumpSelectModalOpen && (
-        <div className="fixed inset-0 bg-opacity-10 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold dark:text-white">
-                TIME TABLE에 추가
-              </h3>
-              <button
-                onClick={closeBrainDumpSelectModal}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* 시간 표시 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  선택된 시간
-                </label>
-                <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-2 text-sm dark:text-gray-200">
-                    <Clock className="size-4 text-blue-600 dark:text-blue-400" />
-                    <span className="font-medium">
-                      {String(
-                        selectedTimeSlotInfo?.hour || 0,
-                      ).padStart(2, "0")}
-                      :
-                      {String(
-                        selectedTimeSlotInfo?.startMinute || 0,
-                      ).padStart(2, "0")}{" "}
-                      -{" "}
-                      {selectedTimeSlotInfo?.startMinute === 0
-                        ? String(selectedTimeSlotInfo?.hour || 0).padStart(2, "0")
-                        : String((selectedTimeSlotInfo?.hour || 0) + 1).padStart(2, "0")}
-                      :
-                      {selectedTimeSlotInfo?.startMinute === 0
-                        ? "30"
-                        : "00"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* BRAIN DUMP 선택 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  BRAIN DUMP 선택 (복수 선택 가능)
-                </label>
-                <div className="max-h-[300px] overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2">
-                  <div className="space-y-1">
-                    {brainDumps.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() =>
-                          setSelectedBrainDumpForTimeBox(
-                            (prev) =>
-                              prev.includes(item.id)
-                                ? prev.filter(
-                                    (id) => id !== item.id,
-                                  )
-                                : [...prev, item.id],
-                          )
-                        }
-                        className={`w-full text-left flex items-start gap-3 p-2 rounded-lg transition-colors ${
-                          selectedBrainDumpForTimeBox.includes(
-                            item.id,
-                          )
-                            ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                            : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                        }`}
-                      >
-                        <div
-                          className={`mt-0.5 size-5 border-2 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                            selectedBrainDumpForTimeBox.includes(
-                              item.id,
-                            )
-                              ? "bg-blue-600 border-blue-600"
-                              : "border-gray-300 dark:border-gray-600"
-                          }`}
-                        >
-                          {selectedBrainDumpForTimeBox.includes(
-                            item.id,
-                          ) && (
-                            <div className="size-2 bg-white rounded-full"></div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {item.category}
-                            </span>
-                          </div>
-                          <div
-                            className={`text-sm ${
-                              selectedBrainDumpForTimeBox.includes(
-                                item.id,
-                              )
-                                ? "font-medium dark:text-white"
-                                : "dark:text-gray-200"
-                            }`}
-                          >
-                            {item.text}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {selectedBrainDumpForTimeBox.length === 0 ? (
-                  <div className="mt-2 text-xs text-red-500">
-                    최소 1개 항목을 선택해주세요
-                  </div>
-                ) : (
-                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    <span className="font-medium">
-                      {selectedBrainDumpForTimeBox.length}개
-                      항목 선택됨
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* 버튼 */}
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={closeBrainDumpSelectModal}
-                  className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={addBrainDumpToTimeBox}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  TIME TABLE에 추가
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}      
+      <BrainDumpDetailModal
+        isOpen={isDetailModalOpen}
+        brainDumpItem={selectedBrainDumpForDetail}
+        selectedTimeSlots={selectedTimeSlots}
+        color={detailColor}
+        onClose={closeDetailModal}
+        onSave={saveDetailToTimeBox}
+        onToggleTimeSlot={toggleTimeSlot}
+        onColorChange={setDetailColor}
+      />
+      <BrainDumpSelectModal
+        isOpen={isBrainDumpSelectModalOpen}
+        timeSlotInfo={selectedTimeSlotInfo}
+        brainDumps={brainDumps}
+        selectedIds={selectedBrainDumpForTimeBox}
+        onClose={closeBrainDumpSelectModal}
+        onConfirm={addBrainDumpToTimeBox}
+        onToggleItem={(id) =>
+          setSelectedBrainDumpForTimeBox((prev) =>
+            prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+          )
+        }
+      />
     </div>
   );
 }
